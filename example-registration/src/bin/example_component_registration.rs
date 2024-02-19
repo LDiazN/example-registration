@@ -5,7 +5,7 @@ use std::any::Any;
 use std::sync::Mutex;
 
 lazy_static! {
-    static ref COMPONENT_REGISTERS: Mutex<Vec<RegisterEntry>> = Mutex::new(vec![]);
+    static ref COMPONENT_REGISTRY: Mutex<Vec<RegisterEntry>> = Mutex::new(vec![]);
 }
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ macro_rules! register_component {
                 let component = $function();
                 Box::new(component)
             }
-            let _ = COMPONENT_REGISTERS.lock().as_mut().and_then(|registry| {
+            let _ = COMPONENT_REGISTRY.lock().as_mut().and_then(|registry| {
                 let id = registry.len() as u32;
                 registry.push(RegisterEntry {
                 name: stringify!($component).to_string(),
@@ -54,7 +54,7 @@ register_component! {
 }
 
 fn main() {
-    let registry = COMPONENT_REGISTERS.lock().unwrap();
+    let registry = COMPONENT_REGISTRY.lock().unwrap();
     for entry in registry.iter() {
         let any_value = (entry.factory)();
         let component = any_value.downcast_ref::<MyComponent>().unwrap();

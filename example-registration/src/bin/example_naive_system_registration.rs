@@ -10,10 +10,6 @@ lazy_static! {
     static ref COMPONENT_REGISTRY: Mutex<Vec<ComponentRegistryEntry>> = Mutex::new(vec![]);
 }
 
-lazy_static! {
-    static ref COMPONENT_REGISTRATION_FUNCTIONS: Mutex<Vec<fn() -> ()>> = Mutex::new(vec![]);
-}
-
 #[derive(Debug)]
 struct ComponentRegistryEntry {
     name: String,
@@ -26,26 +22,20 @@ macro_rules! register_component {
     ($component:ident, $function:ident) => {
         #[ctor]
         fn add_to_component_registry() {
-            fn function_to_add() {
-                fn factory_any() -> Box<dyn Any> {
-                    let component = $function();
-                    Box::new(component)
-                }
-                let _ = COMPONENT_REGISTRY.lock().as_mut().and_then(|registry| {
-                    let id = registry.len() as u32;
-                    registry.push(ComponentRegistryEntry {
-                    name: stringify!($component).to_string(),
-                    name_crc: hash(stringify!($component).as_bytes()),
-                    factory: factory_any,
-                    id 
-                    });
-                    $component::set_id(id);
-                    Ok(())
-                });
+            fn factory_any() -> Box<dyn Any> {
+                let component = $function();
+                Box::new(component)
             }
-
-            let _ = COMPONENT_REGISTRATION_FUNCTIONS.lock().as_mut().map(|functions| {
-                functions.push(function_to_add);
+            let _ = COMPONENT_REGISTRY.lock().as_mut().and_then(|registry| {
+                let id = registry.len() as u32;
+                registry.push(ComponentRegistryEntry {
+                name: stringify!($component).to_string(),
+                name_crc: hash(stringify!($component).as_bytes()),
+                factory: factory_any,
+                id 
+                });
+                $component::set_id(id);
+                Ok(())
             });
         }
 
@@ -97,10 +87,6 @@ lazy_static! {
     static ref SYSTEM_REGISTRY: Mutex<Vec<SystemRegistryEntry>> = Mutex::new(vec![]);
 }
 
-lazy_static! {
-    static ref SYSTEM_REGISTRATION_FUNCTIONS: Mutex<Vec<fn() -> ()>> = Mutex::new(vec![]);
-}
-
 #[derive(Debug)]
 struct SystemRegistryEntry {
     name: String,
@@ -114,23 +100,17 @@ macro_rules! register_system {
     ($function:ident, dependencies = [$($dependency:ident),*]) => {
         #[ctor]
         fn add_to_system_registry() {
-            fn function_to_add() {
-                let _ = SYSTEM_REGISTRY.lock().as_mut().and_then(|registry| {
-                    let dependencies : Vec<u32> = vec![$($dependency ::get_id() ),*];
-                    let id = registry.len() as u32;
-                        registry.push(SystemRegistryEntry{
-                        name: stringify!($function).to_string(),
-                        name_crc: hash(stringify!($function).as_bytes()),
-                        function: $function,
-                        dependencies,
-                        id 
-                    });
-                    Ok(())
+            let _ = SYSTEM_REGISTRY.lock().as_mut().and_then(|registry| {
+                let dependencies : Vec<u32> = vec![$($dependency ::get_id() ),*];
+                let id = registry.len() as u32;
+                    registry.push(SystemRegistryEntry{
+                    name: stringify!($function).to_string(),
+                    name_crc: hash(stringify!($function).as_bytes()),
+                    function: $function,
+                    dependencies,
+                    id 
                 });
-            }
-
-            let _ = SYSTEM_REGISTRATION_FUNCTIONS.lock().as_mut().map(|functions| {
-                functions.push(function_to_add);
+                Ok(())
             });
         }
     };
@@ -150,14 +130,6 @@ register_component! {
 }
 
 fn main() {
-    // Register components and systems in the right order
-    for comp_fn in COMPONENT_REGISTRATION_FUNCTIONS.lock().as_ref().unwrap().iter() {
-        comp_fn();
-    }
-    for sys_fn in SYSTEM_REGISTRATION_FUNCTIONS.lock().as_ref().unwrap().iter() {
-        sys_fn();
-    }
-
     let comp_registry = COMPONENT_REGISTRY.lock().unwrap();
     for entry in comp_registry.iter() {
         let any_value = (entry.factory)();
