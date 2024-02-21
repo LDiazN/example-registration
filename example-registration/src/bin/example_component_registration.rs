@@ -5,11 +5,11 @@ use std::any::Any;
 use std::sync::Mutex;
 
 lazy_static! {
-    static ref COMPONENT_REGISTRY: Mutex<Vec<RegisterEntry>> = Mutex::new(vec![]);
+    static ref COMPONENT_REGISTRY: Mutex<Vec<ComponentRegistryEntry>> = Mutex::new(vec![]);
 }
 
 #[derive(Debug)]
-struct RegisterEntry {
+struct ComponentRegistryEntry {
     name: String,
     name_crc: u32,
     factory: fn() -> Box<dyn Any>,
@@ -26,7 +26,7 @@ macro_rules! register_component {
             }
             let _ = COMPONENT_REGISTRY.lock().as_mut().and_then(|registry| {
                 let id = registry.len() as u32;
-                registry.push(RegisterEntry {
+                registry.push(ComponentRegistryEntry {
                 name: stringify!($component).to_string(),
                 name_crc: hash(stringify!($component).as_bytes()),
                 factory: factory_any,
